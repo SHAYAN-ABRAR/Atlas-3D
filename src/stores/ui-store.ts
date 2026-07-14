@@ -120,6 +120,18 @@ export const useUIStore = create<UIStore>()(
     {
       name: `${STORAGE_PREFIX}ui`,
       storage: createJSONStorage(() => localStorage),
+      version: 2,
+      migrate: (persisted) => {
+        const s = persisted as Partial<UIStore>;
+        // Retired default models: replace with the current default so a
+        // shipped default change reaches existing browsers. A model the
+        // user typed in Settings themselves is never one of these.
+        const retired = ['kimi-k2.6:cloud', 'deepseek-v3.1:671b', 'qwen3.5:397b-cloud', 'glm-5.1:cloud'];
+        if (s.ollamaModel && retired.includes(s.ollamaModel)) {
+          s.ollamaModel = OLLAMA_DEFAULT_MODEL;
+        }
+        return s;
+      },
       partialize: (s) => ({
         theme: s.theme,
         leftOpen: s.leftOpen,

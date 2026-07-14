@@ -22,7 +22,7 @@ export const DB_NAME = 'atlas3d';
 export const DB_VERSION = 1;
 
 export const OLLAMA_DEFAULT_URL = 'http://127.0.0.1:11434';
-export const OLLAMA_DEFAULT_MODEL = 'kimi-k2.6:cloud';
+export const OLLAMA_DEFAULT_MODEL = 'gemma4:31b-cloud';
 
 export const DEFAULT_WORLD: WorldState = {
   seed: 20260707,

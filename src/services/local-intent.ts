@@ -249,7 +249,7 @@ export function interpretLocally(
   if (commands.length === 0) {
     return {
       reply:
-        "I couldn't map that to a scene change while offline. Start Ollama (`ollama run kimi-k2.6:cloud`) for full natural-language control, or try things like “sunset lighting”, “make it mountainous with rivers”, “japanese architecture”, or “make all roads 25% wider”.",
+        "I couldn't map that to a scene change while offline. Start Ollama (`ollama run gemma4:31b-cloud`) for full natural-language control, or try things like “sunset lighting”, “make it mountainous with rivers”, “japanese architecture”, or “make all roads 25% wider”.",
       commands: [],
     };
   }
