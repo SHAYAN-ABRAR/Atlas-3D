@@ -397,9 +397,13 @@ function buildJunctionNetwork(rawPolylines: RoadPolyline[]): {
 
     // Junction polygon: the trimmed ribbon end corners, tucked slightly
     // into the ribbons so the shared boundary can never show a hairline.
-    // Walking the *edges* in angular order and emitting right-then-left
-    // corners per end guarantees a simple (non-self-intersecting) ring.
-    const ends: { angle: number; right: [number, number]; left: [number, number] }[] = [];
+    // The fill fans out from the corner centroid, so the ring must be
+    // star-shaped around it: sort every corner by its own azimuth about
+    // that center. Grouping corners per end instead (right-then-left) makes
+    // the ring self-intersect whenever one end's corners straddle another's.
+    // Descending angle = clockwise in the XZ plane = upward-facing fan
+    // triangles; ascending would get the whole patch back-face culled.
+    const raw: [number, number][] = [];
     let cx = 0;
     let cz = 0;
     for (const a of info) {
@@ -411,19 +415,19 @@ function buildJunctionNetwork(rawPolylines: RoadPolyline[]): {
       const dz = (q1[1] - q0[1]) / len;
       const bx = q0[0] + dx * 0.45;
       const bz = q0[1] + dz * 0.45;
-      ends.push({
-        angle: Math.atan2(dz, dx),
-        right: [bx + dz * a.h, bz - dx * a.h],
-        left: [bx - dz * a.h, bz + dx * a.h],
-      });
+      raw.push([bx + dz * a.h, bz - dx * a.h], [bx - dz * a.h, bz + dx * a.h]);
       cx += q0[0];
       cz += q0[1];
     }
     cx /= info.length;
     cz /= info.length;
-    ends.sort((a, b) => a.angle - b.angle);
-    const corners: [number, number][] = [];
-    for (const e of ends) corners.push(e.right, e.left);
+    const corners = raw
+      .map((pt): { angle: number; pt: [number, number] } => ({
+        angle: Math.atan2(pt[1] - cz, pt[0] - cx),
+        pt,
+      }))
+      .sort((a, b) => b.angle - a.angle)
+      .map((c) => c.pt);
     junctions.push({ x: cx, z: cz, ring: corners });
   }
 

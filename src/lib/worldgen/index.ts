@@ -76,6 +76,11 @@ export function generateWorld(world: WorldState): GeneratedWorld {
     });
     const radius = r.width * 0.5 + 2.5;
     for (let s = 0; s <= steps; s++) {
+      // Deep-water spans become bridges — the renderer keeps the deck above
+      // the surface — so leave the lakebed alone instead of raising a berm
+      // that pokes through the water as a mud causeway. Shallow shore zones
+      // still grade up to form natural abutments.
+      if (world.water.enabled && smooth[s] < waterLevel - 0.7) continue;
       const t = s / steps;
       const cx = r.ax + (r.bx - r.ax) * t;
       const cz = r.az + (r.bz - r.az) * t;
