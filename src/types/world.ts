@@ -84,6 +84,10 @@ export interface MapAnalysis {
   /** Row-major cell classes, length = width * height. */
   cells: number[];
   sourceName: string;
+  /** Human-readable place name when the map was auto-located. */
+  location?: string;
+  /** How the cells were derived: real OpenStreetMap data or pixel classification. */
+  source?: 'osm' | 'classifier';
   coverage: { water: number; vegetation: number; road: number; building: number };
 }
 

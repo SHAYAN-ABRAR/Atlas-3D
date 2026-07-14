@@ -233,10 +233,15 @@ export default function Workspace() {
       try {
         store.log('info', `Analyzing “${file.name}”…`);
         const dataUrl = await fileToDataUrl(file);
-        const analysis = await analyzeMapImage(dataUrl, file.name);
+        const analysis = await analyzeMapImage(dataUrl, file.name, (s) => store.log('info', s));
         store.setMapImage(dataUrl);
         store.updateWorld({ map: { enabled: true, analysis } }, `Import map ${file.name}`);
-        store.log('success', `Map analyzed — generation is now guided by “${file.name}”`);
+        store.log(
+          'success',
+          analysis.source === 'osm'
+            ? `Located “${analysis.location}” — world is built from real OpenStreetMap data`
+            : `Map analyzed — generation is now guided by “${file.name}”`,
+        );
         useUIStore.getState().set({ leftTab: 'assets', leftOpen: true });
       } catch (err) {
         store.log('error', `Map import failed: ${String(err)}`);

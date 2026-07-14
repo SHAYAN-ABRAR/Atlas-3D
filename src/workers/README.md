@@ -52,7 +52,9 @@ uploaded image
       │
       ▼
 analyzeMapImage()            (src/services/map-analysis.ts)
-  ├─ cover-fit draw to a 96×96 canvas, read back RGBA
+  ├─ try auto-location first  (src/services/geolocate.ts: OCR → Nominatim →
+  │        Overpass → rasterize real OSM data; worker not involved)
+  ├─ otherwise: cover-fit draw to a 96×96 canvas, read back RGBA
   ├─ classifyInWorker(data) ──► map-analysis.worker.ts ──► classifyPixels()
   │        │
   │        └─ 4 s timeout / worker error ─┐
@@ -94,7 +96,7 @@ entry point — it must have no DOM dependencies and communicate only through
 
 | File | Role |
 |---|---|
-| [`src/lib/classify.ts`](../lib/classify.ts) | The pure classifier (thresholds + one denoise pass) shared by worker and fallback. |
+| [`src/lib/classify.ts`](../lib/classify.ts) | The pure classifier (color rules + shape-based candidate resolution + denoise) shared by worker and fallback. |
 | [`src/services/map-analysis.ts`](../services/map-analysis.ts) | Downsamples the image, drives the worker, computes coverage stats. |
 | [`src/config/constants.ts`](../config/constants.ts) | `MAP_ANALYSIS_RES` — the 96×96 analysis grid resolution. |
 | [`src/types/world.ts`](../types/world.ts) | `MapAnalysis` — the result type (`cells`, `coverage`, dimensions). |

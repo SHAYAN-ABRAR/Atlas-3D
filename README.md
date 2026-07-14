@@ -211,16 +211,33 @@ assets**.
 
 ## Importing maps
 
-Drop an image anywhere (landing page, viewport, or the Assets tab). The image is
-downsampled to a 96×96 grid in a Web Worker and each cell is classified:
+Drop an image anywhere (landing page, viewport, or the Assets tab). Two analysis paths
+produce the same 96×96 class grid that guides generation:
+
+**1. Auto-location (satellite screenshots with place labels).** The importer OCRs the
+place names burned into the screenshot (tesseract.js, on your machine), geocodes them
+against OpenStreetMap's Nominatim, keeps only labels that agree on one area, then
+downloads the *real* roads, water bodies, buildings and green space for that spot from
+the Overpass API. The world is then built from actual map data — streets connect, ponds
+sit where they really are. The console and Assets tab show the located place name.
+Privacy note: the image itself never leaves your machine; only the extracted place-name
+text is sent as geocoding queries.
+
+**2. Pixel classification (everything else, and the offline fallback).** The image is
+downsampled to the grid in a Web Worker, auto-leveled so hazy and punchy renders measure
+alike, and each cell is classified:
 
 | Class | Detected from | Effect on generation |
 |---|---|---|
-| Water | blue-dominant pixels | sinks below the water line |
-| Vegetation | green-dominant pixels | forests concentrate here |
-| Road | dark, low-saturation strokes | road segments trace the runs |
-| Building | mid-gray mass and brick/roof reds | lots and structures appear here |
-| Terrain | everything else | normal heightfield |
+| Water | blue or algae-green, glassy-smooth regions | sinks below the water line |
+| Vegetation | green-dominant or textured dark canopy | forests concentrate here |
+| Road | ribbon-shaped gray/dark corridors, route overlays | road segments trace the runs |
+| Building | massive bright or textured blocks, brick/roof reds | lots and structures appear here |
+| Terrain | warm dirt, sand, open ground, everything else | normal heightfield |
+
+Ambiguous colors (gray pavement vs. rooftop, dark pond vs. tree shade) are resolved by
+*shape*: thin ribbons become streets, compact smooth blobs become water, textured mass
+becomes buildings or canopy.
 
 The console reports the coverage breakdown after analysis. The **“Guide generation with
 this map”** switch (Assets tab) toggles between map-guided and purely procedural

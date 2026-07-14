@@ -31,8 +31,9 @@ export function UploadZone() {
       }
       setBusy('Analyzing map…');
       const dataUrl = await fileToDataUrl(file);
-      const analysis = await analyzeMapImage(dataUrl, file.name);
-      const name = file.name.replace(/\.[^.]+$/, '') || 'Imported map';
+      const analysis = await analyzeMapImage(dataUrl, file.name, setBusy);
+      const name =
+        analysis.location ?? (file.name.replace(/\.[^.]+$/, '') || 'Imported map');
       const id = store.newProject(name, { map: { enabled: true, analysis } }, dataUrl);
       const record = store.toRecord(null);
       if (record) await putProject(record);

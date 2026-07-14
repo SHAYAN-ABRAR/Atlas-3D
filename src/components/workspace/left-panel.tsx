@@ -122,13 +122,17 @@ function AssetsTab() {
     try {
       log('info', `Analyzing “${file.name}”…`);
       const dataUrl = await fileToDataUrl(file);
-      const analysis = await analyzeMapImage(dataUrl, file.name);
+      const analysis = await analyzeMapImage(dataUrl, file.name, (s) => log('info', s));
       setMapImage(dataUrl);
       updateWorld({ map: { enabled: true, analysis } }, `Import map ${file.name}`);
       const c = analysis.coverage;
+      const from =
+        analysis.source === 'osm'
+          ? `Located “${analysis.location}” — built from OpenStreetMap data`
+          : 'Analyzed from pixels';
       log(
         'success',
-        `Map analyzed — water ${(c.water * 100).toFixed(0)}%, vegetation ${(c.vegetation * 100).toFixed(0)}%, roads ${(c.road * 100).toFixed(0)}%, built ${(c.building * 100).toFixed(0)}%`,
+        `${from} — water ${(c.water * 100).toFixed(0)}%, vegetation ${(c.vegetation * 100).toFixed(0)}%, roads ${(c.road * 100).toFixed(0)}%, built ${(c.building * 100).toFixed(0)}%`,
       );
     } catch (err) {
       log('error', `Map import failed: ${String(err)}`);
@@ -151,6 +155,12 @@ function AssetsTab() {
           <div className="overflow-hidden rounded-md border border-line">
             <img src={mapImage} alt="Project map" className="block max-h-40 w-full object-cover" />
             <div className="space-y-2.5 border-t border-line p-2.5">
+              {world.map.analysis?.location && (
+                <div className="text-2xs text-ink-faint">
+                  Located: <span className="text-ink-muted">{world.map.analysis.location}</span>
+                  {' · '}OpenStreetMap data
+                </div>
+              )}
               <Switch
                 label="Guide generation with this map"
                 checked={world.map.enabled}

@@ -51,10 +51,30 @@ function classifyInWorker(
 }
 
 /**
- * Downsamples an uploaded map and classifies every cell as
- * terrain / water / vegetation / road / building.
+ * Analyzes an uploaded map into terrain / water / vegetation / road /
+ * building cells. First tries to auto-locate the map from the place labels
+ * in the image and build the grid from real OpenStreetMap data; when the
+ * map can't be confidently located (no labels, offline, ambiguous hits) it
+ * falls back to on-device pixel classification.
  */
-export async function analyzeMapImage(dataUrl: string, sourceName: string): Promise<MapAnalysis> {
+export async function analyzeMapImage(
+  dataUrl: string,
+  sourceName: string,
+  onStatus?: (status: string) => void,
+): Promise<MapAnalysis> {
+  try {
+    const { locateMap } = await import('./geolocate');
+    const located = await locateMap(dataUrl, sourceName, onStatus);
+    if (located) return located.analysis;
+  } catch {
+    // any geolocation failure falls through to pixel classification
+  }
+  onStatus?.('Classifying map pixels…');
+  return classifyMapImage(dataUrl, sourceName);
+}
+
+/** Pure on-device pixel classification (the offline path). */
+export async function classifyMapImage(dataUrl: string, sourceName: string): Promise<MapAnalysis> {
   const img = await loadImage(dataUrl);
   const res = MAP_ANALYSIS_RES;
   // Classify from oversampled pixels so per-cell texture can tell smooth
@@ -90,6 +110,7 @@ export async function analyzeMapImage(dataUrl: string, sourceName: string): Prom
     height: res,
     cells,
     sourceName,
+    source: 'classifier',
     coverage: {
       water: counts[1] / total,
       vegetation: counts[2] / total,
