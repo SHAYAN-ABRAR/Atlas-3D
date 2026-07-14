@@ -10,17 +10,31 @@ export interface OllamaConfig {
   model: string;
 }
 
+/**
+ * Tolerates how endpoints actually get typed into the settings field:
+ * stray whitespace, trailing slashes, a missing scheme. A malformed
+ * stored URL must degrade to a fixable state, never a silent "offline".
+ */
+export function normalizeOllamaUrl(url: string): string {
+  let u = url.trim().replace(/\/+$/, '');
+  if (u && !/^https?:\/\//i.test(u)) u = `http://${u}`;
+  return u || 'http://127.0.0.1:11434';
+}
+
 export async function checkOllama(config: OllamaConfig): Promise<{
   status: OllamaStatus;
   models: string[];
 }> {
   try {
-    const res = await fetch(`${config.url}/api/tags`, { signal: AbortSignal.timeout(2500) });
+    const res = await fetch(`${normalizeOllamaUrl(config.url)}/api/tags`, {
+      signal: AbortSignal.timeout(6000),
+    });
     if (!res.ok) return { status: 'offline', models: [] };
     const json = (await res.json()) as { models?: { name: string }[] };
     const models = (json.models ?? []).map((m) => m.name);
-    const base = config.model.split(':')[0];
-    const hasModel = models.some((m) => m === config.model || m.startsWith(base));
+    const wanted = config.model.trim();
+    const base = wanted.split(':')[0];
+    const hasModel = models.some((m) => m === wanted || m.startsWith(base));
     return { status: hasModel ? 'online' : 'model-missing', models };
   } catch {
     return { status: 'offline', models: [] };
@@ -68,12 +82,12 @@ export async function streamChat(opts: {
   signal?: AbortSignal;
 }): Promise<string> {
   const { config, system, messages, onToken, signal } = opts;
-  const res = await fetch(`${config.url}/api/chat`, {
+  const res = await fetch(`${normalizeOllamaUrl(config.url)}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal,
     body: JSON.stringify({
-      model: config.model,
+      model: config.model.trim(),
       stream: true,
       messages: [
         { role: 'system', content: system },
@@ -81,7 +95,17 @@ export async function streamChat(opts: {
       ],
     }),
   });
-  if (!res.ok || !res.body) throw new Error(`Ollama responded ${res.status}`);
+  if (!res.ok || !res.body) {
+    // Surface Ollama's own explanation (e.g. "this model requires a
+    // subscription") — it's actionable, unlike a bare status code.
+    let detail = '';
+    try {
+      detail = ((await res.json()) as { error?: string }).error ?? '';
+    } catch {
+      // No JSON body — fall back to the status code.
+    }
+    throw new Error(detail || `Ollama responded ${res.status}`);
+  }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

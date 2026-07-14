@@ -91,8 +91,11 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       persistMessages(get().projectKey, get().messages);
     };
 
+    // Re-probe whenever we're not known-online: the user may have started
+    // Ollama or pulled the model since the last check, and a single stale
+    // "offline" result must never wedge the assistant into offline mode.
     let status = get().status;
-    if (status === 'unknown') status = await get().checkStatus();
+    if (status !== 'online') status = await get().checkStatus();
 
     const world = useProjectStore.getState().world;
 
@@ -136,12 +139,20 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         finish({ content: get().messages.find((m) => m.id === draft.id)?.content ?? '(stopped)' });
         return;
       }
-      // Model call failed mid-flight — degrade gracefully to the offline path.
+      // Model call failed mid-flight. Still try the offline interpreter so
+      // scene commands keep working, but show Ollama's actual error — a
+      // subscription refusal must read as one, not as "start Ollama".
       const { reply, commands } = interpretLocally(text, world);
       const result = commands.length > 0 ? applyCommands(commands) : { applied: [], note: undefined };
-      set({ status: 'offline' });
+      // Only a network-level failure means the server is gone; an HTTP
+      // error (paywall, bad model) comes from a live server.
+      if (err instanceof TypeError) set({ status: 'offline' });
+      const detail = (err as Error).message || String(err);
       finish({
-        content: result.note ?? (reply || `Ollama request failed: ${String(err)}`),
+        content:
+          result.applied.length > 0
+            ? (result.note ?? reply)
+            : `Ollama error: ${detail}`,
         applied: result.applied,
         offline: true,
       });
