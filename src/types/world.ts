@@ -88,6 +88,13 @@ export interface MapAnalysis {
   location?: string;
   /** How the cells were derived: real OpenStreetMap data or pixel classification. */
   source?: 'osm' | 'classifier';
+  /**
+   * Exact road centerlines in grid coordinates (0..width floats), present
+   * when the map came from real OSM data. Generation uses these directly so
+   * streets keep their true curves instead of being re-traced from cells.
+   * `w` is a width multiplier by road class.
+   */
+  roadPaths?: { w: number; pts: [number, number][] }[];
   coverage: { water: number; vegetation: number; road: number; building: number };
 }
 
@@ -115,6 +122,28 @@ export interface RoadSegment {
   bx: number;
   bz: number;
   width: number;
+}
+
+/**
+ * A whole street as one world-space polyline. Rendering drapes each as a
+ * single continuous mitered ribbon, so curves stay smooth and lane dashes
+ * run unbroken; `roads` segments are derived from these for grading,
+ * clearance and occupancy.
+ */
+export interface RoadPolyline {
+  pts: [number, number][];
+  width: number;
+}
+
+/**
+ * A paved intersection. `ring` is the junction polygon boundary, built from
+ * the trimmed end corners of every ribbon meeting here — the ribbons stop
+ * at this boundary, so the network renders seamlessly with no overlaps.
+ */
+export interface RoadJunction {
+  x: number;
+  z: number;
+  ring: [number, number][];
 }
 
 export interface BuildingInstance {
@@ -160,6 +189,8 @@ export interface GeneratedWorld {
   heights: Float32Array;
   waterLevel: number;
   roads: RoadSegment[];
+  roadPolylines: RoadPolyline[];
+  junctions: RoadJunction[];
   buildings: BuildingInstance[];
   trees: TreeInstance[];
   stats: WorldStats;

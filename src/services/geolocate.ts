@@ -176,7 +176,7 @@ export async function fetchOsm(
   const bb = bbox.join(',');
   const query = `[out:json][timeout:25];
 (
-  way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|living_street|pedestrian)"](${bb});
+  way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|pedestrian)"](${bb});
   way["building"](${bb});
   way["natural"="water"](${bb});
   way["water"](${bb});
@@ -273,6 +273,87 @@ function strokeLine(cells: number[], res: number, line: Ring, cls: number, radiu
 const isClosed = (ring: Ring) =>
   ring.length > 3 &&
   Math.hypot(ring[0][0] - ring[ring.length - 1][0], ring[0][1] - ring[ring.length - 1][1]) < 0.01;
+
+/** Width multiplier per OSM road class. */
+function roadWidthClass(highway: string): number {
+  if (/^(motorway|trunk)$/.test(highway)) return 1.7;
+  if (highway === 'primary') return 1.5;
+  if (/^(secondary|tertiary)$/.test(highway)) return 1.2;
+  return 1;
+}
+
+/**
+ * Clips a polyline to the grid square [0, res], splitting it into the
+ * sub-paths that lie inside (Liang–Barsky per segment). Clamping instead
+ * would drag exit points along the border and bend the road.
+ */
+export function clipPath(pts: Ring, res: number): Ring[] {
+  const out: Ring[] = [];
+  let current: Ring = [];
+  const flush = () => {
+    if (current.length >= 2) out.push(current);
+    current = [];
+  };
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, az] = pts[i - 1];
+    const [bx, bz] = pts[i];
+    const dx = bx - ax;
+    const dz = bz - az;
+    let t0 = 0;
+    let t1 = 1;
+    let rejected = false;
+    for (const [p, q] of [
+      [-dx, ax],
+      [dx, res - ax],
+      [-dz, az],
+      [dz, res - az],
+    ]) {
+      if (p === 0) {
+        if (q < 0) rejected = true;
+        continue;
+      }
+      const t = q / p;
+      if (p < 0) t0 = Math.max(t0, t);
+      else t1 = Math.min(t1, t);
+    }
+    if (rejected || t0 > t1) {
+      flush();
+      continue;
+    }
+    const enter: [number, number] = [ax + dx * t0, az + dz * t0];
+    const exit: [number, number] = [ax + dx * t1, az + dz * t1];
+    if (current.length === 0 || t0 > 0) {
+      flush();
+      current = [enter];
+    }
+    current.push(exit);
+    if (t1 < 1) flush();
+  }
+  flush();
+  return out;
+}
+
+/**
+ * Exact road centerlines in grid coordinates, clipped to the grid square.
+ * These ride along with the rasterized cells so world generation can lay
+ * streets with their true curves instead of re-tracing pixels.
+ */
+export function extractRoadPaths(
+  elements: OverpassElement[],
+  bbox: [number, number, number, number],
+  res: number,
+): { w: number; pts: [number, number][] }[] {
+  const paths: { w: number; pts: [number, number][] }[] = [];
+  for (const el of elements) {
+    const highway = el.tags?.highway;
+    if (!highway || !el.geometry) continue;
+    const w = roadWidthClass(highway);
+    for (const pts of clipPath(toGrid(el.geometry, bbox, res), res)) {
+      paths.push({ w, pts });
+    }
+  }
+  return paths;
+}
 
 export function rasterizeOsm(
   elements: OverpassElement[],
@@ -373,6 +454,7 @@ export async function locateMap(
 
   const res = MAP_ANALYSIS_RES;
   const cells = rasterizeOsm(elements, bbox, res);
+  const roadPaths = extractRoadPaths(elements, bbox, res);
   const counts = [0, 0, 0, 0, 0];
   for (const c of cells) counts[c]++;
   const total = cells.length;
@@ -387,6 +469,7 @@ export async function locateMap(
       sourceName,
       location,
       source: 'osm',
+      roadPaths,
       coverage: {
         water: counts[WATER] / total,
         vegetation: counts[VEGETATION] / total,

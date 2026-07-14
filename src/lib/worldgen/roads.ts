@@ -313,6 +313,11 @@ function trace(mask: Uint8Array, width: number, height: number): CellPoint[][] {
   return paths;
 }
 
+/** Light Douglas–Peucker for externally supplied vector paths. */
+export function simplifyPath(path: CellPoint[], epsilon: number): CellPoint[] {
+  return simplify(path, epsilon);
+}
+
 /** Douglas–Peucker; closed loops are split in half so they don't collapse. */
 function simplify(path: CellPoint[], epsilon: number): CellPoint[] {
   const first = path[0];

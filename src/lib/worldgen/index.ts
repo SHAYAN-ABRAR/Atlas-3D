@@ -46,7 +46,7 @@ export function generateWorld(world: WorldState): GeneratedWorld {
   const { heights, waterLevel } = buildHeightfield(world, res, size);
   let sampler = makeSampler(heights, res, size);
 
-  const { roads, buildings } = generateCity(world, sampler, waterLevel, size);
+  const { roads, polylines, junctions, buildings } = generateCity(world, sampler, waterLevel, size);
 
   const half = size / 2;
   const cell = size / (res - 1);
@@ -171,6 +171,8 @@ export function generateWorld(world: WorldState): GeneratedWorld {
     heights,
     waterLevel,
     roads,
+    roadPolylines: polylines,
+    junctions,
     buildings: settled,
     trees,
     heightAt: sampler,
@@ -182,7 +184,11 @@ export function generateWorld(world: WorldState): GeneratedWorld {
       waterCoverage: underwater / heights.length,
       greenCoverage,
       triangleEstimate:
-        (res - 1) * (res - 1) * 2 + settled.length * 22 + trees.length * 60 + roads.length * 12,
+        (res - 1) * (res - 1) * 2 +
+        settled.length * 22 +
+        trees.length * 60 +
+        roads.length * 12 +
+        junctions.length * 18,
     },
   };
 
