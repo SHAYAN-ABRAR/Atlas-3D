@@ -57,24 +57,45 @@ npm run start
 
 ## Setting up the AI assistant
 
+The **Assistant** tab is a co-designer with hands on every control the inspector
+exposes. It's not a chatbot bolted onto the side — its replies carry validated scene
+commands that edit the live world:
+
+- **Direct the world in plain language.** "Create a medieval kingdom", "make it
+  mountainous with rivers", "cyberpunk night with rain" — world generation, terrain,
+  architecture, roads, vegetation, water, lighting, weather and materials are all fair
+  game, including precise tweaks like "make all roads 25% wider".
+- **Ask grounded questions.** The model sees a compact live summary of the scene
+  (building counts, road length, coverage, seed, performance), so "how many buildings
+  are there?" and "what would make this run faster?" get real answers, not guesses.
+- **Drive the camera.** Ask for a cinematic fly-through and it choreographs a tour of
+  the world; touching any input hands the camera straight back to you.
+- **One request, one undo step.** A reply carrying several commands applies atomically —
+  a single `Ctrl Z` reverts the whole request, and the History tab shows it as one entry.
+- **Show its work.** Replies stream in live, every applied command appears as a green
+  chip under the message, and anything handled by the offline interpreter is tagged with
+  an `offline` badge. Prompt history, ⭐ favorites and 19 curated templates live in the
+  same panel.
+
 The assistant streams from a locally running Ollama server. Nothing leaves your machine
 unless you choose an Ollama **cloud** model (those execute on Ollama's servers under your
 Ollama account).
 
 ```bash
 # install ollama from https://ollama.com, then:
-ollama run kimi-k2.6:cloud
+ollama run gemma4:31b-cloud
 ```
 
-The default model is `kimi-k2.6:cloud`. Both the endpoint (`http://127.0.0.1:11434`) and
+The default model is `gemma4:31b-cloud`. Both the endpoint (`http://127.0.0.1:11434`) and
 the model name are configurable in **Settings → Local AI**, with a one-click connection
-test. Any chat-capable Ollama model works — e.g. `gemma4:31b-cloud` or a fully local model
+test. Any chat-capable Ollama model works — e.g. `glm-5.1:cloud` or a fully local model
 like `llama3.1`.
 
-> **Note on cloud models:** some Ollama cloud models (including Kimi) require a paid
-> Ollama subscription. If the status chip says *Model not pulled* or requests fail with
-> `403 — this model requires a subscription`, either upgrade at
-> [ollama.com/upgrade](https://ollama.com/upgrade) or switch the model in Settings.
+> **Note on cloud models:** `-cloud` tags execute on Ollama's servers under your Ollama
+> account, and some require a paid Ollama subscription. If the status chip says *Model
+> not pulled* or requests fail with `403 — this model requires a subscription`, either
+> upgrade at [ollama.com/upgrade](https://ollama.com/upgrade) or switch the model in
+> Settings.
 
 ### No Ollama? It still works
 
