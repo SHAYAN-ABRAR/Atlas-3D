@@ -77,9 +77,10 @@ commands that edit the live world:
   an `offline` badge. Prompt history, ⭐ favorites and 19 curated templates live in the
   same panel.
 
-The assistant streams from a locally running Ollama server. Nothing leaves your machine
-unless you choose an Ollama **cloud** model (those execute on Ollama's servers under your
-Ollama account).
+The assistant streams from a locally running Ollama server, or — on a deployed site with
+a hosted assistant configured (see below) — from a server-side proxy, so visitors don't
+need Ollama at all. Locally, nothing leaves your machine unless you choose an Ollama
+**cloud** model (those execute on Ollama's servers under your Ollama account).
 
 ```bash
 # install ollama from https://ollama.com, then:
@@ -87,7 +88,7 @@ ollama run gemma4:31b-cloud
 ```
 
 The default model is `gemma4:31b-cloud`. Both the endpoint (`http://127.0.0.1:11434`) and
-the model name are configurable in **Settings → Local AI**, with a one-click connection
+the model name are configurable in **Settings → AI assistant**, with a one-click connection
 test. Any chat-capable Ollama model works — e.g. `glm-5.1:cloud` or a fully local model
 like `llama3.1`.
 
@@ -96,6 +97,23 @@ like `llama3.1`.
 > not pulled* or requests fail with `403 — this model requires a subscription`, either
 > upgrade at [ollama.com/upgrade](https://ollama.com/upgrade) or switch the model in
 > Settings.
+
+### Deploying for visitors (hosted assistant)
+
+On a deployed site (Vercel, etc.) visitors don't run Ollama, so the app ships a
+server-side proxy at `/api/assistant`. Set these environment variables on the
+deployment and every visitor gets a working assistant — the API key never reaches
+the browser:
+
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `ASSISTANT_API_KEY` | yes | Enables the proxy. API key for the upstream host (for ollama.com: **Settings → API Keys**). |
+| `ASSISTANT_UPSTREAM_URL` | no | Ollama-compatible server to forward to. Defaults to `https://ollama.com` (Ollama cloud). |
+| `ASSISTANT_MODEL` | no | Force a model server-side, overriding whatever clients have configured. |
+
+The client probes the proxy first and falls back to local Ollama, so `npm run dev`
+without a key behaves exactly as before. Users who set a custom endpoint in
+**Settings → AI assistant** always win over both defaults.
 
 ### No Ollama? It still works
 

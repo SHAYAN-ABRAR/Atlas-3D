@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu } from '@/components/ui/menu';
 import { Tooltip } from '@/components/ui/tooltip';
+import { HOSTED_ASSISTANT_URL } from '@/config/constants';
 import { PROMPT_TEMPLATES } from '@/config/prompt-templates';
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/stores/chat-store';
@@ -24,20 +25,26 @@ import type { ChatMessage } from '@/types/chat';
 function StatusChip() {
   const status = useChatStore((s) => s.status);
   const checkStatus = useChatStore((s) => s.checkStatus);
+  const endpoint = useChatStore((s) => s.endpoint);
   const model = useUIStore((s) => s.ollamaModel);
+  const hosted = endpoint === HOSTED_ASSISTANT_URL;
 
   const meta = {
     online: { dot: 'bg-ok', text: model },
     offline: { dot: 'bg-warn', text: 'Offline interpreter' },
-    'model-missing': { dot: 'bg-warn', text: 'Model not pulled' },
+    'model-missing': { dot: 'bg-warn', text: hosted ? 'Model unavailable' : 'Model not pulled' },
     unknown: { dot: 'bg-ink-faint', text: 'Checking…' },
   }[status];
 
   const title =
     status === 'online'
-      ? `Connected to Ollama (${model})`
+      ? hosted
+        ? `Connected to the hosted assistant (${model})`
+        : `Connected to Ollama (${model})`
       : status === 'model-missing'
-        ? `Ollama is running but “${model}” isn't available — run: ollama run ${model}`
+        ? hosted
+          ? `The hosted assistant doesn't serve “${model}” — switch models in Settings`
+          : `Ollama is running but “${model}” isn't available — run: ollama run ${model}`
         : `Start Ollama for full natural-language control (ollama run ${model}). Common commands still work offline.`;
 
   return (

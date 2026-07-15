@@ -4,9 +4,11 @@ import { generateWorld } from '@/lib/worldgen';
 import { applyCommands } from '@/services/commands';
 import { loadLocal, saveLocal } from '@/services/db';
 import { interpretLocally } from '@/services/local-intent';
+import { HOSTED_ASSISTANT_URL, OLLAMA_DEFAULT_URL } from '@/config/constants';
 import {
   buildSystemPrompt,
   checkOllama,
+  normalizeOllamaUrl,
   parseSceneCommands,
   streamChat,
   stripCommandBlocks,
@@ -19,6 +21,8 @@ interface ChatStore {
   projectKey: string | null;
   messages: ChatMessage[];
   status: OllamaStatus;
+  /** Endpoint that won the last status probe; what send() streams from. */
+  endpoint: string | null;
   availableModels: string[];
   sending: boolean;
   history: string[];
@@ -42,6 +46,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   projectKey: null,
   messages: [],
   status: 'unknown',
+  endpoint: null,
   availableModels: [],
   sending: false,
   history: loadLocal<string[]>('prompt-history', []),
@@ -58,9 +63,28 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
   checkStatus: async () => {
     const { ollamaUrl, ollamaModel } = useUIStore.getState();
-    const { status, models } = await checkOllama({ url: ollamaUrl, model: ollamaModel });
-    set({ status, availableModels: models });
-    return status;
+    // The hosted proxy serves visitors who don't run Ollama, so it's probed
+    // first — unless the user pointed the app at a custom endpoint, which
+    // always wins over defaults.
+    const custom = normalizeOllamaUrl(ollamaUrl) !== OLLAMA_DEFAULT_URL;
+    const candidates = custom
+      ? [ollamaUrl, HOSTED_ASSISTANT_URL]
+      : [HOSTED_ASSISTANT_URL, ollamaUrl];
+
+    let best: { url: string; status: OllamaStatus; models: string[] } | null = null;
+    for (const url of candidates) {
+      const { status, models } = await checkOllama({ url, model: ollamaModel });
+      if (status === 'online') {
+        set({ status, availableModels: models, endpoint: url });
+        return status;
+      }
+      // A reachable server missing the model beats an unreachable one.
+      if (!best || (status === 'model-missing' && best.status === 'offline')) {
+        best = { url, status, models };
+      }
+    }
+    set({ status: best!.status, availableModels: best!.models, endpoint: best!.url });
+    return best!.status;
   },
 
   send: async (prompt) => {
@@ -117,7 +141,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       set({ abortController: controller });
       const { ollamaUrl, ollamaModel } = useUIStore.getState();
       const full = await streamChat({
-        config: { url: ollamaUrl, model: ollamaModel },
+        config: { url: get().endpoint ?? ollamaUrl, model: ollamaModel },
         system,
         messages: get().messages.filter((m) => !m.streaming && m.role !== 'system'),
         signal: controller.signal,

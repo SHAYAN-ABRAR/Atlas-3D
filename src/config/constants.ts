@@ -23,6 +23,9 @@ export const DB_VERSION = 1;
 
 export const OLLAMA_DEFAULT_URL = 'http://127.0.0.1:11434';
 export const OLLAMA_DEFAULT_MODEL = 'gemma4:31b-cloud';
+// Same-origin proxy that serves the assistant to visitors without Ollama
+// (enabled by setting ASSISTANT_API_KEY on the deployment).
+export const HOSTED_ASSISTANT_URL = '/api/assistant';
 
 export const DEFAULT_WORLD: WorldState = {
   seed: 20260707,

@@ -3,7 +3,11 @@ import type { ChatMessage, OllamaStatus } from '@/types/chat';
 import type { SceneCommand } from '@/types/commands';
 import type { GeneratedWorld, WorldState } from '@/types/world';
 
-/** Client for a locally running Ollama instance. Everything stays on this machine. */
+/**
+ * Client for an Ollama-compatible endpoint: a locally running instance
+ * (everything stays on this machine) or the deployment's same-origin
+ * /api/assistant proxy when one is configured.
+ */
 
 export interface OllamaConfig {
   url: string;
@@ -17,6 +21,7 @@ export interface OllamaConfig {
  */
 export function normalizeOllamaUrl(url: string): string {
   let u = url.trim().replace(/\/+$/, '');
+  if (u.startsWith('/')) return `/${u.replace(/^\/+/, '')}`; // same-origin path, e.g. the hosted assistant proxy
   if (u && !/^https?:\/\//i.test(u)) u = `http://${u}`;
   return u || 'http://127.0.0.1:11434';
 }

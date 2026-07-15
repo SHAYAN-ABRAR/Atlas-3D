@@ -8,7 +8,7 @@ import { Kbd } from '@/components/ui/kbd';
 import { SelectField } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { SHORTCUT_GROUPS } from '@/config/shortcuts';
-import { OLLAMA_DEFAULT_MODEL, OLLAMA_DEFAULT_URL } from '@/config/constants';
+import { HOSTED_ASSISTANT_URL, OLLAMA_DEFAULT_MODEL, OLLAMA_DEFAULT_URL } from '@/config/constants';
 import { useChatStore } from '@/stores/chat-store';
 import { useUIStore, type Theme } from '@/stores/ui-store';
 
@@ -46,6 +46,8 @@ export function SettingsDialog() {
   const ui = useUIStore();
   const checkStatus = useChatStore((s) => s.checkStatus);
   const status = useChatStore((s) => s.status);
+  const endpoint = useChatStore((s) => s.endpoint);
+  const hosted = endpoint === HOSTED_ASSISTANT_URL;
   const [testing, setTesting] = useState(false);
 
   return (
@@ -63,7 +65,7 @@ export function SettingsDialog() {
 
         <div className="space-y-2.5">
           <div className="text-2xs font-medium uppercase tracking-wider text-ink-faint">
-            Local AI (Ollama)
+            AI assistant
           </div>
           <div>
             <div className="mb-1 text-xs text-ink-muted">Endpoint</div>
@@ -94,7 +96,11 @@ export function SettingsDialog() {
               {testing ? 'Testing…' : 'Test connection'}
             </Button>
             <span className="text-xs text-ink-faint">
-              {status === 'online' && <span className="text-ok">Connected</span>}
+              {status === 'online' && (
+                <span className="text-ok">
+                  {hosted ? 'Connected — hosted assistant' : 'Connected — local Ollama'}
+                </span>
+              )}
               {status === 'offline' && <span className="text-warn">Not reachable — offline interpreter active</span>}
               {status === 'model-missing' && (
                 <span className="text-warn">Reachable, but pull the model first</span>
@@ -103,8 +109,14 @@ export function SettingsDialog() {
             </span>
           </div>
           <p className="text-2xs leading-relaxed text-ink-faint">
-            Run <code className="rounded bg-surface px-1 py-px font-mono">ollama run {ui.ollamaModel || OLLAMA_DEFAULT_MODEL}</code>{' '}
-            in a terminal. Everything stays on this machine — no cloud storage, no accounts.
+            {hosted ? (
+              <>This site provides a hosted assistant, so chat works without any setup. To keep everything on your machine instead, run{' '}
+              <code className="rounded bg-surface px-1 py-px font-mono">ollama run {ui.ollamaModel || OLLAMA_DEFAULT_MODEL}</code>{' '}
+              and point the endpoint at it.</>
+            ) : (
+              <>Run <code className="rounded bg-surface px-1 py-px font-mono">ollama run {ui.ollamaModel || OLLAMA_DEFAULT_MODEL}</code>{' '}
+              in a terminal. Everything stays on this machine — no cloud storage, no accounts.</>
+            )}
           </p>
         </div>
 
