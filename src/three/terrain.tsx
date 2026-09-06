@@ -7,7 +7,7 @@ import { SimplexNoise } from '@/lib/noise';
 import type { GeneratedWorld, WorldState } from '@/types/world';
 import { createDetailTexture } from './textures';
 
-const hexToColor = (hex: string) => new THREE.Color(hex).convertSRGBToLinear();
+const hexToColor = (hex: string) => new THREE.Color(hex);
 
 export function Terrain({ gen, world }: { gen: GeneratedWorld; world: WorldState }) {
   const detail = useMemo(() => {
@@ -40,7 +40,7 @@ export function Terrain({ gen, world }: { gen: GeneratedWorld; world: WorldState
       const gz = Math.floor(i / res);
       if (h < waterLevel) {
         // Underwater bed — darkened sand.
-        c.copy(stops[0]).multiplyScalar(0.55);
+        c.copy(stops[0]).multiplyScalar(0.78);
       } else {
         const t = Math.min(0.999, Math.max(0, (h - waterLevel) / Math.max(1, amp - waterLevel)));
         const seg = t * (stops.length - 1);
@@ -55,6 +55,10 @@ export function Terrain({ gen, world }: { gen: GeneratedWorld; world: WorldState
         // Fine per-vertex tonal jitter.
         const jitter = 0.95 + ((gx * 7 + gz * 13) % 11) * 0.009;
         c.multiplyScalar(jitter);
+        // Damp sediment softens the transition from the river bed to dry vegetation.
+        const bank = Math.max(0, 1 - (h - waterLevel) / 1.25);
+        if (world.water.enabled && bank > 0)
+          c.lerp(stops[0].clone().multiplyScalar(0.72), bank * 0.7);
       }
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
@@ -62,13 +66,20 @@ export function Terrain({ gen, world }: { gen: GeneratedWorld; world: WorldState
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     return geo;
-  }, [gen, world.terrain.style, world.terrain.amplitude, world.seed]);
+  }, [gen, world.terrain.style, world.terrain.amplitude, world.seed, world.water.enabled]);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
     <mesh geometry={geometry} name="terrain" receiveShadow>
-      <meshStandardMaterial vertexColors map={detail} roughness={0.96} metalness={0} />
+      <meshStandardMaterial
+        vertexColors
+        map={detail}
+        bumpMap={detail}
+        bumpScale={0.09}
+        roughness={0.96}
+        metalness={0}
+      />
     </mesh>
   );
 }

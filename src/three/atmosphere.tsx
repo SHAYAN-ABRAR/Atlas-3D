@@ -4,7 +4,7 @@ import { Sky, Stars } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { Sky as SkyMesh } from 'three/examples/jsm/objects/Sky.js';
 import { LIGHTING_PRESETS, QUALITY_LEVELS } from '@/config/constants';
 import { useUIStore } from '@/stores/ui-store';
 import type { WorldState } from '@/types/world';
@@ -25,14 +25,38 @@ export function Atmosphere({ world }: { world: WorldState }) {
   // Procedural IBL — glass and metal need something to reflect.
   useEffect(() => {
     const pmrem = new THREE.PMREMGenerator(gl);
-    const env = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    const surroundings = new THREE.Scene();
+    surroundings.background = new THREE.Color(preset.background);
+    const sky = new SkyMesh();
+    sky.scale.setScalar(1000);
+    if (preset.sky) {
+      const uniforms = sky.material.uniforms;
+      uniforms.sunPosition.value.set(...sunPosition);
+      uniforms.turbidity.value = preset.sky.turbidity;
+      uniforms.rayleigh.value = preset.sky.rayleigh;
+      uniforms.mieCoefficient.value = preset.sky.mieCoefficient;
+      uniforms.mieDirectionalG.value = preset.sky.mieDirectionalG;
+      surroundings.add(sky);
+    }
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(2000, 2000),
+      new THREE.MeshBasicMaterial({ color: '#555b46' }),
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -15;
+    surroundings.add(ground);
+    const env = pmrem.fromScene(surroundings, 0.06, 0.1, 3000);
     scene.environment = env.texture;
+    sky.geometry.dispose();
+    sky.material.dispose();
+    ground.geometry.dispose();
+    ground.material.dispose();
     pmrem.dispose();
     return () => {
       scene.environment = null;
-      env.texture.dispose();
+      env.dispose();
     };
-  }, [gl, scene]);
+  }, [gl, scene, preset, sunPosition]);
 
   useEffect(() => {
     gl.toneMappingExposure = preset.exposure * world.lighting.exposure;
@@ -84,7 +108,11 @@ export function Atmosphere({ world }: { world: WorldState }) {
       />
       {/* Sky-fill from opposite the sun keeps shadowed facades readable. */}
       <directionalLight
-        position={[-sunPosition[0] * sunDistance, sunDistance * 0.45, -sunPosition[2] * sunDistance]}
+        position={[
+          -sunPosition[0] * sunDistance,
+          sunDistance * 0.45,
+          -sunPosition[2] * sunDistance,
+        ]}
         intensity={Math.max(0.18, preset.sunIntensity * 0.17)}
         color={preset.sky ? '#cdd9e8' : preset.fogColor}
       />

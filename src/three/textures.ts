@@ -139,11 +139,17 @@ export function createRoadTexture(seed: number, look: RoadLook): THREE.CanvasTex
 export interface FacadeTextures {
   map: THREE.CanvasTexture;
   emissive: THREE.CanvasTexture;
+  bump: THREE.CanvasTexture;
+  roughness: THREE.CanvasTexture;
 }
 
-export function createFacadeTextures(kind: 'tower' | 'cottage', seed = 913): FacadeTextures {
-  const W = 128;
-  const H = 256;
+export function createFacadeTextures(
+  kind: 'tower' | 'cottage',
+  seed = 913,
+  surface: 'plaster' | 'timber' | 'masonry' = 'plaster',
+): FacadeTextures {
+  const W = 256;
+  const H = 128;
   const mapCanvas = document.createElement('canvas');
   const emiCanvas = document.createElement('canvas');
   mapCanvas.width = emiCanvas.width = W;
@@ -159,14 +165,30 @@ export function createFacadeTextures(kind: 'tower' | 'cottage', seed = 913): Fac
     mctx.fillStyle = rng() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(60,55,48,0.04)';
     mctx.fillRect(rng() * W, rng() * H, 2, 2);
   }
+  // Keep construction joints subtle and at the same scale as the window bays.
+  mctx.fillStyle = 'rgba(70,64,54,0.13)';
+  if (surface === 'timber') {
+    for (let x = 0; x < W; x += 10) {
+      mctx.fillRect(x, 0, 1, H);
+      mctx.fillStyle = 'rgba(70,64,54,0.06)';
+      mctx.fillRect(x + 3, rng() * 16, 1, H);
+      mctx.fillStyle = 'rgba(70,64,54,0.13)';
+    }
+  } else if (surface === 'masonry') {
+    for (let y = 0; y < H; y += 8) {
+      mctx.fillRect(0, y, W, 0.8);
+      for (let x = y % 16 ? 8 : 0; x < W; x += 16) mctx.fillRect(x, y, 0.8, 8);
+    }
+  }
   ectx.fillStyle = '#000';
   ectx.fillRect(0, 0, W, H);
 
-  const cols = kind === 'tower' ? 5 : 2;
-  const rows = kind === 'tower' ? 11 : 2;
+  // One tile is two window bays and one storey; geometry supplies metric UVs.
+  const cols = 2;
+  const rows = 1;
   const cw = W / cols;
   const ch = H / rows;
-  const inset = kind === 'tower' ? 4.5 : 9;
+  const inset = kind === 'tower' ? 22 : 34;
 
   for (let r = 0; r < rows; r++) {
     // Floor slab shadow line (towers only)
@@ -192,6 +214,10 @@ export function createFacadeTextures(kind: 'tower' | 'cottage', seed = 913): Fac
       mctx.strokeStyle = 'rgba(35,32,28,0.55)';
       mctx.lineWidth = 1.4;
       mctx.strokeRect(x + 0.7, y + 0.7, w - 1.4, h - 1.4);
+      mctx.fillStyle = 'rgba(30,28,25,0.25)';
+      mctx.fillRect(x - 3, y + h + 3, w + 6, 4);
+      mctx.fillStyle = '#dedbd2';
+      mctx.fillRect(x - 3, y + h, w + 6, 3);
       if (kind === 'cottage') {
         // Muntin cross
         mctx.fillStyle = 'rgba(240,238,232,0.9)';
@@ -209,8 +235,68 @@ export function createFacadeTextures(kind: 'tower' | 'cottage', seed = 913): Fac
 
   const map = canvasTexture(mapCanvas);
   const emissive = canvasTexture(emiCanvas);
-  const repeat: [number, number] = kind === 'tower' ? [2, 3] : [1, 1];
-  map.repeat.set(...repeat);
-  emissive.repeat.set(...repeat);
-  return { map, emissive };
+  const bumpCanvas = document.createElement('canvas');
+  const roughCanvas = document.createElement('canvas');
+  bumpCanvas.width = roughCanvas.width = W;
+  bumpCanvas.height = roughCanvas.height = H;
+  const bctx = bumpCanvas.getContext('2d')!;
+  const rctx = roughCanvas.getContext('2d')!;
+  bctx.fillStyle = '#a0a0a0';
+  bctx.fillRect(0, 0, W, H);
+  rctx.fillStyle = '#eeeeee';
+  rctx.fillRect(0, 0, W, H);
+  for (let c = 0; c < cols; c++) {
+    bctx.fillStyle = '#404040';
+    bctx.fillRect(c * cw + inset, inset, cw - inset * 2, ch - inset * 2);
+    rctx.fillStyle = '#484848';
+    rctx.fillRect(c * cw + inset, inset, cw - inset * 2, ch - inset * 2);
+  }
+  const bump = canvasTexture(bumpCanvas);
+  const roughness = canvasTexture(roughCanvas);
+  bump.colorSpace = roughness.colorSpace = THREE.NoColorSpace;
+  return { map, emissive, bump, roughness };
+}
+
+/** Tileable mineral grain, roof courses, or longitudinal bark relief. */
+export function createSurfaceTexture(kind: 'roof' | 'bark', seed = 617): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  const rng = mulberry32(seed);
+  ctx.fillStyle = '#c8c5bf';
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 4500; i++) {
+    const v = 140 + rng() * 110;
+    ctx.fillStyle = `rgba(${v},${v},${v},0.32)`;
+    ctx.fillRect(
+      rng() * 256,
+      rng() * 256,
+      kind === 'bark' ? 1 : 2,
+      kind === 'bark' ? 8 + rng() * 35 : 2,
+    );
+  }
+  ctx.strokeStyle = 'rgba(45,42,37,0.28)';
+  ctx.lineWidth = 1.5;
+  if (kind === 'roof') {
+    for (let y = 0; y < 256; y += 32) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(256, y);
+      ctx.stroke();
+      for (let x = (y % 64) / 2; x < 256; x += 32) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x, y + 32);
+        ctx.stroke();
+      }
+    }
+  } else {
+    for (let x = 0; x < 256; x += 9) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      for (let y = 16; y <= 256; y += 16) ctx.lineTo(x + Math.sin(y * 0.05 + x) * 2, y);
+      ctx.stroke();
+    }
+  }
+  return canvasTexture(canvas);
 }
