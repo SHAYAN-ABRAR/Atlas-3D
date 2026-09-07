@@ -27,7 +27,7 @@ export const SHORTCUT_GROUPS: { title: string; items: ShortcutDef[] }[] = [
   {
     title: 'Camera',
     items: [
-      { keys: '1', label: 'Orbit mode' },
+      { keys: '1', label: 'Orbit mode  ·  WASD pan' },
       { keys: '2', label: 'Walk mode  ·  WASD + Space' },
       { keys: '3', label: 'Fly mode  ·  WASD + E/Q' },
       { keys: 'F', label: 'Frame world' },

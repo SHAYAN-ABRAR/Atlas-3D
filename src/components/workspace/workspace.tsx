@@ -106,15 +106,16 @@ function ViewportOverlays() {
         </div>
       )}
       <AnimatePresence>
-        {cameraMode !== 'orbit' && !cinematic && (
+        {!cinematic && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3.5 py-1.5 text-2xs text-white/90 backdrop-blur-sm"
           >
-            Click to look around · WASD move · Shift sprint
-            {cameraMode === 'walk' ? ' · Space jump' : ' · E/Q up & down'} · Esc release
+            {cameraMode === 'orbit'
+              ? 'Click scene · WASD pan · Drag orbit · Scroll zoom'
+              : `Click scene · WASD move · Shift sprint${cameraMode === 'walk' ? ' · Space jump' : ' · E/Q up & down'} · Esc release`}
           </motion.div>
         )}
         {cinematic && (

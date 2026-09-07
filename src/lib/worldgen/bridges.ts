@@ -38,12 +38,23 @@ export function straightenWaterSpans(
     const a = i - 1 >= 0 ? i - 1 : i;
     const b = j < n ? j : j - 1;
     if (b > a) {
-      const da = Math.max(heightAt(samples[a][0], samples[a][1]), floor);
-      const db = Math.max(heightAt(samples[b][0], samples[b][1]), floor);
+      const [ax, az] = samples[a];
+      const [bx, bz] = samples[b];
+      const da = Math.max(heightAt(ax, az), floor);
+      const db = Math.max(heightAt(bx, bz), floor);
+      // Resampled bends have uneven spacing: project using original arc length.
+      const distances = [0];
+      for (let k = a + 1; k <= b; k++) {
+        distances.push(
+          distances[k - a - 1] +
+            Math.hypot(samples[k][0] - samples[k - 1][0], samples[k][1] - samples[k - 1][1]),
+        );
+      }
+      const total = distances[distances.length - 1];
       for (let k = i; k < j; k++) {
-        const t = (k - a) / (b - a);
-        samples[k][0] = samples[a][0] + (samples[b][0] - samples[a][0]) * t;
-        samples[k][1] = samples[a][1] + (samples[b][1] - samples[a][1]) * t;
+        const t = total > 0 ? distances[k - a] / total : (k - a) / (b - a);
+        samples[k][0] = ax + (bx - ax) * t;
+        samples[k][1] = az + (bz - az) * t;
         deck[k] = Math.max(da + (db - da) * t, floor);
       }
     } else {

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { QUALITY_LEVELS } from '@/config/constants';
 import { on, viewportRuntime } from '@/lib/bus';
+import { AdaptiveQuality } from '@/lib/render-quality';
 import { generateWorld } from '@/lib/worldgen';
 import { captureScreenshot, exportGLTF, exportOBJ } from '@/services/exporters';
 import { useProjectStore } from '@/stores/project-store';
@@ -22,8 +23,7 @@ import { Water } from './water';
 
 function PerfTracker() {
   const gl = useThree((s) => s.gl);
-  const belowFor = useRef(0);
-  const downgraded = useRef(false);
+  const adaptive = useRef(new AdaptiveQuality());
 
   // Accumulate render info across the whole frame (main pass + gizmo pass),
   // reading it at the start of the next one.
@@ -43,19 +43,18 @@ function PerfTracker() {
     gl.info.reset();
 
     const { autoQuality, quality, set } = useUIStore.getState();
-    if (!autoQuality || downgraded.current || quality === 'mobile') return;
-    if (viewportRuntime.fps < 27) {
-      belowFor.current += delta;
-      if (belowFor.current > 5) {
-        downgraded.current = true;
-        const next = quality === 'quality' ? 'balanced' : 'mobile';
-        set({ quality: next });
-        useProjectStore
-          .getState()
-          .log('warn', `Sustained low FPS — auto quality stepped down to “${next}”`);
-      }
-    } else {
-      belowFor.current = Math.max(0, belowFor.current - delta * 0.5);
+    const next = adaptive.current.sample(
+      delta,
+      viewportRuntime.fps,
+      quality,
+      autoQuality,
+      !document.hidden,
+    );
+    if (next) {
+      set({ quality: next });
+      useProjectStore
+        .getState()
+        .log('warn', `Sustained low FPS — auto quality stepped down to “${next}”`);
     }
   });
   return null;
@@ -68,11 +67,18 @@ function ViewportBus({ worldRef }: { worldRef: React.RefObject<THREE.Group> }) {
     const log = (level: 'info' | 'success' | 'error', msg: string) =>
       useProjectStore.getState().log(level, msg);
     const name = () =>
-      useProjectStore.getState().name.replace(/[^\w\- ]+/g, '').trim() || 'world';
+      useProjectStore
+        .getState()
+        .name.replace(/[^\w\- ]+/g, '')
+        .trim() || 'world';
     const offs = [
-      on('viewport:screenshot', () => {
-        captureScreenshot(gl.domElement, `${name()}.png`);
-        log('success', 'Screenshot saved');
+      on('viewport:screenshot', async () => {
+        try {
+          await captureScreenshot(gl.domElement, `${name()}.png`);
+          log('success', 'Screenshot saved');
+        } catch (err) {
+          log('error', `Screenshot failed: ${String(err)}`);
+        }
       }),
       on('export:gltf', async () => {
         if (!worldRef.current) return;
@@ -164,7 +170,7 @@ export default function Viewport() {
             userData={{ helper: true }}
           />
         )}
-        <CameraRig gen={gen} />
+        <CameraRig gen={gen} waterEnabled={world.water.enabled && layers.water} />
         {showGizmo && (
           <GizmoHelper alignment="top-right" margin={[52, 52]}>
             <GizmoViewport

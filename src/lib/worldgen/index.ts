@@ -1,5 +1,4 @@
 import { HEIGHTFIELD_RES, WORLD_SIZE } from '@/config/constants';
-import { hashString } from '@/lib/utils';
 import type { GeneratedWorld, WorldState } from '@/types/world';
 import { generateCity } from './city';
 import { buildHeightfield, makeSampler } from './heightfield';
@@ -14,10 +13,17 @@ const cache = new Map<string, GeneratedWorld>();
 const CACHE_LIMIT = 6;
 
 function genKey(world: WorldState): string {
-  const mapHash =
-    world.map.enabled && world.map.analysis
-      ? hashString(world.map.analysis.cells.join(',')).toString(36)
-      : '0';
+  const analysis = world.map.enabled ? world.map.analysis : null;
+  // Exact inputs avoid stale roads when two maps share a classified raster.
+  const mapKey = analysis
+    ? [
+        analysis.width,
+        analysis.height,
+        analysis.cells,
+        analysis.roadPaths ?? null,
+        analysis.coverage,
+      ]
+    : null;
   return JSON.stringify([
     world.seed,
     world.terrain,
@@ -25,7 +31,7 @@ function genKey(world: WorldState): string {
     world.city,
     world.roads,
     world.vegetation,
-    mapHash,
+    mapKey,
   ]);
 }
 
@@ -137,8 +143,7 @@ export function generateWorld(world: WorldState): GeneratedWorld {
     const gx1 = Math.min(OCC - 1, Math.ceil((x + r + half) * occScale));
     const gz0 = Math.max(0, Math.floor((z - r + half) * occScale));
     const gz1 = Math.min(OCC - 1, Math.ceil((z + r + half) * occScale));
-    for (let gz = gz0; gz <= gz1; gz++)
-      for (let gx = gx0; gx <= gx1; gx++) occ[gz * OCC + gx] = 1;
+    for (let gz = gz0; gz <= gz1; gz++) for (let gx = gx0; gx <= gx1; gx++) occ[gz * OCC + gx] = 1;
   };
   for (const b of settled) mark(b.x, b.z, Math.max(b.w, b.d) * 0.75 + 1.5);
   for (const r of roads) {
@@ -166,8 +171,7 @@ export function generateWorld(world: WorldState): GeneratedWorld {
   let tallest = 0;
   for (const b of settled) tallest = Math.max(tallest, b.h);
   const landArea = size * size * (1 - underwater / heights.length);
-  const greenCoverage =
-    landArea > 0 ? Math.min(1, (trees.length * 30) / landArea) : 0;
+  const greenCoverage = landArea > 0 ? Math.min(1, (trees.length * 30) / landArea) : 0;
 
   const generated: GeneratedWorld = {
     key,

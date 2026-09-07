@@ -26,7 +26,6 @@ export function useShortcuts() {
           case 's':
             e.preventDefault();
             window.dispatchEvent(new Event('atlas:save-now'));
-            project.log('success', 'Project saved');
             return;
           case 'z':
             if (isTyping(e)) return;
@@ -66,10 +65,17 @@ export function useShortcuts() {
       if (isTyping(e)) return;
 
       switch (e.key) {
-        case '1': ui.set({ cameraMode: 'orbit' }); break;
-        case '2': ui.set({ cameraMode: 'walk' }); break;
-        case '3': ui.set({ cameraMode: 'fly' }); break;
-        case 'g': case 'G':
+        case '1':
+          ui.set({ cameraMode: 'orbit' });
+          break;
+        case '2':
+          ui.set({ cameraMode: 'walk' });
+          break;
+        case '3':
+          ui.set({ cameraMode: 'fly' });
+          break;
+        case 'g':
+        case 'G':
           ui.set({ showGrid: !ui.showGrid });
           break;
         case 'm':

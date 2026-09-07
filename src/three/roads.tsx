@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { straightenWaterSpans } from '@/lib/worldgen/bridges';
+import { roundRoadBends } from '@/lib/worldgen/road-network';
 import type { BuildingStyle, GeneratedWorld, WorldState } from '@/types/world';
 import { createRoadTexture, type RoadLook } from './textures';
 
@@ -56,7 +57,7 @@ function buildRoadGeometries(
   const bPos: number[] = [];
   const bNrm: number[] = [];
   const bIdx: number[] = [];
-  const step = 3.2;
+  const step = 1.5;
 
   type V3 = [number, number, number];
   // Understructure faces render double-sided (the standard material flips
@@ -80,7 +81,8 @@ function buildRoadGeometries(
     }));
 
   for (let p = 0; p < polys.length; p++) {
-    const { pts, width } = polys[p];
+    const { width } = polys[p];
+    const pts = roundRoadBends(polys[p].pts, width * 0.7);
     // Resample: subdivide long segments so the ribbon follows the terrain.
     const samples: [number, number][] = [];
     for (let i = 1; i < pts.length; i++) {
@@ -212,21 +214,27 @@ function buildRoadGeometries(
           [ex[i + 1], sy[i + 1] + PARAPET, ez[i + 1]],
           [ex[i + 1], sy[i + 1] - BRIDGE_SKIRT, ez[i + 1]],
           [ex[i], sy[i] - BRIDGE_SKIRT, ez[i]],
-          onx, 0, onz,
+          onx,
+          0,
+          onz,
         );
         quad(
           [ex[i], sy[i] + PARAPET, ez[i]],
           [ex[i + 1], sy[i + 1] + PARAPET, ez[i + 1]],
           [ixB, sy[i + 1] + PARAPET, izB],
           [ixA, sy[i] + PARAPET, izA],
-          0, 1, 0,
+          0,
+          1,
+          0,
         );
         quad(
           [ixA, sy[i] + PARAPET, izA],
           [ixB, sy[i + 1] + PARAPET, izB],
           [ixB, sy[i + 1], izB],
           [ixA, sy[i], izA],
-          -onx, 0, -onz,
+          -onx,
+          0,
+          -onz,
         );
       }
       // Piers march down the span, but only where there is real depth —
@@ -253,10 +261,42 @@ function buildRoadGeometries(
         const c2 = corner(1, -1);
         const c3 = corner(1, 1);
         const c4 = corner(-1, 1);
-        quad([c1[0], yTop, c1[1]], [c2[0], yTop, c2[1]], [c2[0], yBot, c2[1]], [c1[0], yBot, c1[1]], -tx, 0, -tz);
-        quad([c3[0], yTop, c3[1]], [c4[0], yTop, c4[1]], [c4[0], yBot, c4[1]], [c3[0], yBot, c3[1]], tx, 0, tz);
-        quad([c2[0], yTop, c2[1]], [c3[0], yTop, c3[1]], [c3[0], yBot, c3[1]], [c2[0], yBot, c2[1]], pnx, 0, pnz);
-        quad([c4[0], yTop, c4[1]], [c1[0], yTop, c1[1]], [c1[0], yBot, c1[1]], [c4[0], yBot, c4[1]], -pnx, 0, -pnz);
+        quad(
+          [c1[0], yTop, c1[1]],
+          [c2[0], yTop, c2[1]],
+          [c2[0], yBot, c2[1]],
+          [c1[0], yBot, c1[1]],
+          -tx,
+          0,
+          -tz,
+        );
+        quad(
+          [c3[0], yTop, c3[1]],
+          [c4[0], yTop, c4[1]],
+          [c4[0], yBot, c4[1]],
+          [c3[0], yBot, c3[1]],
+          tx,
+          0,
+          tz,
+        );
+        quad(
+          [c2[0], yTop, c2[1]],
+          [c3[0], yTop, c3[1]],
+          [c3[0], yBot, c3[1]],
+          [c2[0], yBot, c2[1]],
+          pnx,
+          0,
+          pnz,
+        );
+        quad(
+          [c4[0], yTop, c4[1]],
+          [c1[0], yTop, c1[1]],
+          [c1[0], yBot, c1[1]],
+          [c4[0], yBot, c4[1]],
+          -pnx,
+          0,
+          -pnz,
+        );
       }
     }
   }
@@ -266,9 +306,7 @@ function buildRoadGeometries(
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.setIndex(indices);
-  const normals = new Float32Array(positions.length);
-  for (let i = 0; i < normals.length; i += 3) normals[i + 1] = 1;
-  geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+  geo.computeVertexNormals();
 
   let bridge: THREE.BufferGeometry | null = null;
   if (bIdx.length > 0) {
@@ -286,7 +324,10 @@ function buildRoadGeometries(
  * the ribbons and tucks under their ends, so the network reads as one
  * continuous paved surface with lane dashes stopping at the junction.
  */
-function buildJunctionGeometry(gen: GeneratedWorld, deckLevel: number): THREE.BufferGeometry | null {
+function buildJunctionGeometry(
+  gen: GeneratedWorld,
+  deckLevel: number,
+): THREE.BufferGeometry | null {
   const junctions = (gen.junctions ?? []).filter((j) => j.ring && j.ring.length >= 3);
   if (junctions.length === 0) return null;
   const positions: number[] = [];
@@ -316,9 +357,7 @@ function buildJunctionGeometry(gen: GeneratedWorld, deckLevel: number): THREE.Bu
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.setIndex(indices);
-  const normals = new Float32Array(positions.length);
-  for (let i = 0; i < normals.length; i += 3) normals[i + 1] = 1;
-  geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+  geo.computeVertexNormals();
   return geo;
 }
 
@@ -331,6 +370,7 @@ export function Roads({ gen, world }: { gen: GeneratedWorld; world: WorldState }
   );
   const junctionGeometry = useMemo(() => buildJunctionGeometry(gen, deckLevel), [gen, deckLevel]);
   const look = ROAD_LOOKS[world.city.style];
+  const wet = world.lighting.preset === 'rain' || world.effects.particles === 'rain';
   const texture = useMemo(
     () => createRoadTexture(world.seed & 0xffff, { ...look, curbs: world.roads.sidewalks }),
     [look, world.roads.sidewalks, world.seed],
@@ -364,7 +404,8 @@ export function Roads({ gen, world }: { gen: GeneratedWorld; world: WorldState }
       <mesh geometry={geometry} receiveShadow>
         <meshStandardMaterial
           map={texture}
-          roughness={look.dirt ? 0.98 : 0.92}
+          color={wet ? '#b1b5b8' : '#ffffff'}
+          roughness={wet ? (look.dirt ? 0.78 : 0.38) : look.dirt ? 0.98 : 0.92}
           metalness={0.02}
         />
       </mesh>
@@ -372,7 +413,8 @@ export function Roads({ gen, world }: { gen: GeneratedWorld; world: WorldState }
         <mesh geometry={junctionGeometry} receiveShadow>
           <meshStandardMaterial
             map={plainTexture}
-            roughness={look.dirt ? 0.98 : 0.92}
+            color={wet ? '#b1b5b8' : '#ffffff'}
+            roughness={wet ? (look.dirt ? 0.78 : 0.38) : look.dirt ? 0.98 : 0.92}
             metalness={0.02}
           />
         </mesh>

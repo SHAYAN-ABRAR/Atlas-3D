@@ -12,7 +12,7 @@ const hexToColor = (hex: string) => new THREE.Color(hex);
 export function Terrain({ gen, world }: { gen: GeneratedWorld; world: WorldState }) {
   const detail = useMemo(() => {
     const tex = createDetailTexture(2027);
-    tex.repeat.set(60, 60);
+    tex.repeat.set(140, 140);
     return tex;
   }, []);
   useEffect(() => () => detail.dispose(), [detail]);
@@ -76,7 +76,7 @@ export function Terrain({ gen, world }: { gen: GeneratedWorld; world: WorldState
         vertexColors
         map={detail}
         bumpMap={detail}
-        bumpScale={0.09}
+        bumpScale={0.018}
         roughness={0.96}
         metalness={0}
       />

@@ -178,10 +178,10 @@ The workspace is a three-panel layout around a WebGL viewport. Every panel is re
 
 ### Viewport
 
-- **Orbit** (`1`) — drag to rotate, scroll to zoom, right-drag to pan.
-- **Walk** (`2`) — click to capture the mouse; WASD to move, Shift to sprint,
+- **Orbit** (`1`) — click the scene and use WASD to pan; drag to rotate, scroll to zoom, right-drag to pan.
+- **Walk** (`2`) — click the scene to focus; WASD to move, Shift to sprint,
   Space to jump, Esc to release. Gravity keeps you grounded to the terrain.
-- **Fly** (`3`) — free flight; E/Q or Space/C for up/down.
+- **Fly** (`3`) — click the scene for WASD flight; E/Q or Space/C for up/down. Keyboard movement also works when mouse capture is unavailable.
 - **Cinematic fly-through** — the clapperboard button, the palette, or just ask the
   assistant. Any input hands the camera back to you.
 - **Minimap** (`M`) — live top-down render with your position and view cone.
@@ -392,6 +392,7 @@ Design decisions worth knowing:
 | `npm run build` | Type-checked, linted production build |
 | `npm run start` | Serve the production build |
 | `npm run lint` | ESLint |
+| `npm test` | Regression checks for persistence, exports, maps, bridges, camera controls, and adaptive quality |
 | `npm run format` | Prettier over `src/` |
 
 ---

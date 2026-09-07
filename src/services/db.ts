@@ -16,8 +16,21 @@ function openDb(): Promise<IDBDatabase> {
         store.createIndex('updatedAt', 'updatedAt');
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      db.onclose = () => {
+        dbPromise = null;
+      };
+      resolve(db);
+    };
+    req.onerror = () => {
+      dbPromise = null;
+      reject(req.error);
+    };
   });
   return dbPromise;
 }
@@ -31,19 +44,29 @@ function tx<T>(
       new Promise<T>((resolve, reject) => {
         const t = db.transaction('projects', mode);
         const req = run(t.objectStore('projects'));
-        req.onsuccess = () => resolve(req.result);
+        // A request can succeed and its transaction can still fail (quota, abort).
+        // Only the commit makes it safe for the UI to report a successful save.
+        t.oncomplete = () => resolve(req.result);
+        t.onabort = () => reject(t.error ?? new Error('Project transaction was aborted'));
+        t.onerror = () => reject(t.error ?? req.error);
         req.onerror = () => reject(req.error);
       }),
   );
 }
 
 export async function listProjects(): Promise<ProjectRecord[]> {
-  const all = await tx<ProjectRecord[]>('readonly', (s) => s.getAll() as IDBRequest<ProjectRecord[]>);
+  const all = await tx<ProjectRecord[]>(
+    'readonly',
+    (s) => s.getAll() as IDBRequest<ProjectRecord[]>,
+  );
   return all.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export function getProject(id: string): Promise<ProjectRecord | undefined> {
-  return tx<ProjectRecord | undefined>('readonly', (s) => s.get(id) as IDBRequest<ProjectRecord | undefined>);
+  return tx<ProjectRecord | undefined>(
+    'readonly',
+    (s) => s.get(id) as IDBRequest<ProjectRecord | undefined>,
+  );
 }
 
 export function putProject(record: ProjectRecord): Promise<IDBValidKey> {

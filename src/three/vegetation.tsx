@@ -3,7 +3,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { VEGETATION_STYLES } from '@/config/constants';
+import { QUALITY_LEVELS, VEGETATION_STYLES } from '@/config/constants';
+import { selectDetailInstances } from '@/lib/render-quality';
+import { useUIStore } from '@/stores/ui-store';
 import { mulberry32 } from '@/lib/rng';
 import { createSurfaceTexture } from './textures';
 import type { GeneratedWorld, WorldState } from '@/types/world';
@@ -113,11 +115,14 @@ function buildPalmGeometry() {
 
 export function Vegetation({ gen, world }: { gen: GeneratedWorld; world: WorldState }) {
   const styleDef = VEGETATION_STYLES[world.vegetation.style];
+  const quality = useUIStore((s) => s.quality);
+  const fraction = QUALITY_LEVELS[quality].vegetationScale;
+  const trees = useMemo(() => selectDetailInstances(gen.trees, fraction), [gen, fraction]);
   const palm = world.vegetation.style === 'palm';
   const bark = useMemo(() => createSurfaceTexture('bark'), []);
   useEffect(() => () => bark.dispose(), [bark]);
-  const conifers = useMemo(() => gen.trees.filter((t) => t.kind === 0), [gen]);
-  const broadleaf = useMemo(() => gen.trees.filter((t) => t.kind === 1), [gen]);
+  const conifers = useMemo(() => trees.filter((t) => t.kind === 0), [trees]);
+  const broadleaf = useMemo(() => trees.filter((t) => t.kind === 1), [trees]);
 
   const trunkGeo = useMemo(() => {
     const g = new THREE.CylinderGeometry(0.075, 0.15, 1, 9, 3);
@@ -161,8 +166,8 @@ export function Vegetation({ gen, world }: { gen: GeneratedWorld; world: WorldSt
   useLayoutEffect(() => {
     const trunks = trunksRef.current;
     if (trunks) {
-      for (let i = 0; i < gen.trees.length; i++) {
-        const t = gen.trees[i];
+      for (let i = 0; i < trees.length; i++) {
+        const t = trees[i];
         tmpQuat.setFromAxisAngle(yAxis, t.tint * Math.PI * 2);
         tmpPos.set(t.x, t.y - 0.15, t.z);
         const trunkH = (palm ? 4.8 : t.kind === 0 ? 2.8 : 2.6) * t.scale;
@@ -211,16 +216,16 @@ export function Vegetation({ gen, world }: { gen: GeneratedWorld; world: WorldSt
       );
       tmpMatrix.compose(tmpPos, tmpQuat, tmpScale);
     });
-  }, [gen, conifers, broadleaf, styleDef, palm]);
+  }, [gen, trees, conifers, broadleaf, styleDef, palm]);
 
-  if (gen.trees.length === 0) return null;
+  if (trees.length === 0) return null;
 
   return (
     <group name="vegetation">
       <instancedMesh
-        key={`t-${gen.key}`}
+        key={`t-${gen.key}-${fraction}`}
         ref={trunksRef}
-        args={[trunkGeo, undefined, gen.trees.length]}
+        args={[trunkGeo, undefined, trees.length]}
         castShadow
         receiveShadow
       >
@@ -234,7 +239,7 @@ export function Vegetation({ gen, world }: { gen: GeneratedWorld; world: WorldSt
       </instancedMesh>
       {conifers.length > 0 && (
         <instancedMesh
-          key={`c-${gen.key}-${world.vegetation.style}`}
+          key={`c-${gen.key}-${world.vegetation.style}-${fraction}`}
           ref={conesRef}
           args={[coniferGeo, undefined, conifers.length]}
           castShadow
@@ -245,7 +250,7 @@ export function Vegetation({ gen, world }: { gen: GeneratedWorld; world: WorldSt
       )}
       {broadleaf.length > 0 && (
         <instancedMesh
-          key={`b-${gen.key}-${world.vegetation.style}`}
+          key={`b-${gen.key}-${world.vegetation.style}-${fraction}`}
           ref={blobsRef}
           args={[broadGeo, undefined, broadleaf.length]}
           castShadow

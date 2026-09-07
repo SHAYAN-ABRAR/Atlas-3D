@@ -39,7 +39,7 @@ function mergeWorld(world: WorldState, patch: WorldPatch): WorldState {
   return next;
 }
 
-const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
 interface ProjectStore {
   projectId: string | null;
@@ -65,7 +65,7 @@ interface ProjectStore {
   undo: () => void;
   redo: () => void;
   jumpTo: (index: number) => void;
-  markSaved: () => void;
+  markSaved: (record: ProjectRecord) => void;
   log: (level: LogEntry['level'], message: string) => void;
   clearLogs: () => void;
   toRecord: (thumbnail: string | null) => ProjectRecord | null;
@@ -89,9 +89,10 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
   logs: [],
 
   newProject: (name = 'Untitled world', worldPatch = {}, mapImage = null) => {
+    pendingSnapshot = null;
     const id = uid('p_');
     const world = mergeWorld(clone(DEFAULT_WORLD), worldPatch as WorldPatch);
-    world.seed = Math.floor(Math.random() * 2 ** 31);
+    if (worldPatch.seed === undefined) world.seed = Math.floor(Math.random() * 2 ** 31);
     set({
       projectId: id,
       name,
@@ -102,27 +103,24 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
       future: [],
       dirty: true,
       lastSavedAt: null,
-      logs: [
-        { id: uid(), level: 'success', message: `Project “${name}” created`, at: Date.now() },
-      ],
+      logs: [{ id: uid(), level: 'success', message: `Project “${name}” created`, at: Date.now() }],
     });
     return id;
   },
 
   loadProject: (record) => {
+    pendingSnapshot = null;
     set({
       projectId: record.id,
       name: record.name,
       createdAt: record.createdAt,
       mapImage: record.mapImage,
-      world: { ...clone(DEFAULT_WORLD), ...record.world },
+      world: mergeWorld(clone(DEFAULT_WORLD), clone(record.world)),
       past: [],
       future: [],
       dirty: false,
       lastSavedAt: record.updatedAt,
-      logs: [
-        { id: uid(), level: 'info', message: `Opened “${record.name}”`, at: Date.now() },
-      ],
+      logs: [{ id: uid(), level: 'info', message: `Opened “${record.name}”`, at: Date.now() }],
     });
   },
 
@@ -211,7 +209,16 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
     }
   },
 
-  markSaved: () => set({ dirty: false, lastSavedAt: Date.now() }),
+  markSaved: (record) => {
+    const state = get();
+    if (state.projectId !== record.id) return;
+    // A write acknowledges its own immutable snapshot, never edits made in flight.
+    const current =
+      state.world === record.world &&
+      state.name === record.name &&
+      state.mapImage === record.mapImage;
+    set({ dirty: !current, lastSavedAt: record.updatedAt });
+  },
 
   log: (level, message) =>
     set((s) => ({

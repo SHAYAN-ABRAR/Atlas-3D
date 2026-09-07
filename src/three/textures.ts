@@ -37,14 +37,7 @@ export function createDetailTexture(seed = 101): THREE.CanvasTexture {
   }
   ctx.putImageData(img, 0, 0);
 
-  // Soft mottling so the grain has structure at two scales.
-  for (let i = 0; i < 90; i++) {
-    const r = 6 + rng() * 22;
-    ctx.fillStyle = `rgba(${rng() > 0.5 ? '255,255,255' : '20,26,14'},0.05)`;
-    ctx.beginPath();
-    ctx.arc(rng() * size, rng() * size, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Broad variation comes from world-space terrain colors, not repeated blobs.
   return canvasTexture(canvas);
 }
 
@@ -125,8 +118,9 @@ export function createRoadTexture(seed: number, look: RoadLook): THREE.CanvasTex
   }
 
   if (look.dashes && !look.dirt) {
-    ctx.fillStyle = 'rgba(216,208,172,0.8)';
-    for (let y = 8; y < H; y += 56) ctx.fillRect(W / 2 - 1.6, y, 3.2, 26);
+    ctx.fillStyle = 'rgba(230,226,204,0.78)';
+    // At a typical 6.2 m road width these are approximately 3 m dashes / 3 m gaps.
+    for (let y = 12; y < H; y += 128) ctx.fillRect(W / 2 - 1.2, y, 2.4, 62);
   }
 
   return canvasTexture(canvas);
